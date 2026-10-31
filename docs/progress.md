@@ -3,7 +3,7 @@
 Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 
 - [x] Phase 0 — Repo scaffold & tooling
-- [ ] Phase 1 — Config & API contract skeleton
+- [x] Phase 1 — Config & API contract skeleton
 - [ ] Phase 2 — Schema unit tests
 - [ ] Phase 3 — Document ingestion & parsing (Docling)
 - [ ] Phase 4 — Hierarchical chunker + Qdrant hybrid index
@@ -21,3 +21,4 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 ## Verification log
 
 - Phase 0: `uv sync` ok; `pytest` 1 passed; `GET /health` 200.
+- Phase 1: `pytest` 8 passed; ruff clean; live curl verified analyze (202), results (200), verify-citizen (501 stub), OpenAPI (200).
