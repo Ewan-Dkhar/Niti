@@ -112,6 +112,10 @@ class CitizenProfile(BaseModel):
     income: int = Field(ge=0, description="Annual household income in INR")
     occupation: str = Field(description="Occupation, e.g. street_vendor")
     state: str = Field(description="Indian state or union territory")
+    documents: list[str] = Field(
+        default_factory=list,
+        description="Documents the citizen already holds, e.g. ['Aadhaar Card']",
+    )
 
 
 class VerifyCitizenRequest(BaseModel):

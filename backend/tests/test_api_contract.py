@@ -103,16 +103,37 @@ def test_analyze_rejects_unknown_language() -> None:
     assert response.status_code == 422
 
 
-def test_verify_citizen_is_not_implemented_yet() -> None:
+def test_verify_citizen_checks_completed_analysis() -> None:
+    created = client.post(
+        "/api/v1/analyze",
+        json={"document_url": "https://egazette.gov.in/sample.pdf", "target_language": "hi-IN"},
+    ).json()
+
     response = client.post(
         "/api/v1/verify-citizen",
         json={
-            "policy_id": "sample",
+            "policy_id": created["task_id"],
             "citizen_profile": {"income": 180000, "occupation": "street_vendor", "state": "Delhi"},
         },
     )
 
-    assert response.status_code == 501
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_eligible"] is True
+    assert body["matched_clauses"] == []
+    assert body["missing_documents"] == []
+
+
+def test_verify_citizen_rejects_unknown_policy() -> None:
+    response = client.post(
+        "/api/v1/verify-citizen",
+        json={
+            "policy_id": "missing",
+            "citizen_profile": {"income": 1, "occupation": "worker", "state": "Delhi"},
+        },
+    )
+
+    assert response.status_code == 404
 
 
 def test_openapi_schema_renders() -> None:
