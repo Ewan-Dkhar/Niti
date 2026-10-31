@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     extraction_provider: str = "auto"
     extraction_model: str | None = None
+    simplification_model: str = "llama-3.3-70b-versatile"
+
+    sarvam_tts_model: str = "bulbul:v3"
+    sarvam_speaker: str = "anushka"
 
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None

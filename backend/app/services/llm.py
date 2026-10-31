@@ -114,7 +114,13 @@ class ExtractionError(RuntimeError):
 
 
 class ExtractionProvider(Protocol):
-    def extract(self, *, document_text: str, target_language: str) -> PolicyExtraction: ...
+    def extract(
+        self,
+        *,
+        document_text: str,
+        target_language: str,
+        correction_guidance: str | None = None,
+    ) -> PolicyExtraction: ...
 
 
 def _clean(text: str) -> str:
@@ -239,7 +245,13 @@ def heuristic_extract(document_text: str) -> PolicyExtraction:
 
 
 class MockExtractionProvider:
-    def extract(self, *, document_text: str, target_language: str) -> PolicyExtraction:
+    def extract(
+        self,
+        *,
+        document_text: str,
+        target_language: str,
+        correction_guidance: str | None = None,
+    ) -> PolicyExtraction:
         return heuristic_extract(document_text)
 
 
@@ -248,7 +260,13 @@ class AnthropicExtractionProvider:
         self.api_key = api_key
         self.model = model
 
-    def extract(self, *, document_text: str, target_language: str) -> PolicyExtraction:
+    def extract(
+        self,
+        *,
+        document_text: str,
+        target_language: str,
+        correction_guidance: str | None = None,
+    ) -> PolicyExtraction:
         import anthropic
 
         client = anthropic.Anthropic(api_key=self.api_key)
@@ -259,7 +277,9 @@ class AnthropicExtractionProvider:
             messages=[
                 {
                     "role": "user",
-                    "content": build_user_prompt(document_text, target_language),
+                    "content": build_user_prompt(
+                        document_text, target_language, correction_guidance
+                    ),
                 }
             ],
             tools=[
@@ -284,7 +304,13 @@ class OpenAIExtractionProvider:
         self.api_key = api_key
         self.model = model
 
-    def extract(self, *, document_text: str, target_language: str) -> PolicyExtraction:
+    def extract(
+        self,
+        *,
+        document_text: str,
+        target_language: str,
+        correction_guidance: str | None = None,
+    ) -> PolicyExtraction:
         from openai import OpenAI
 
         client = OpenAI(api_key=self.api_key)
@@ -298,7 +324,9 @@ class OpenAIExtractionProvider:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": build_user_prompt(document_text, target_language),
+                    "content": build_user_prompt(
+                        document_text, target_language, correction_guidance
+                    ),
                 },
             ],
             response_format=PolicyExtraction,

@@ -80,9 +80,11 @@ def extract_rules_node(state: AgentState) -> dict:
     context_text = "\n\n".join(f"[{chunk.citation}] {chunk.text}" for chunk in context)
 
     provider = get_extraction_provider()
+    guidance = (state.get("audit_report") or {}).get("correction_guidance")
     extraction = provider.extract(
         document_text=context_text,
         target_language=state.get("target_language", "hi-IN"),
+        correction_guidance=guidance,
     )
 
     logger.info(

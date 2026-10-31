@@ -40,8 +40,9 @@ def test_graph_runs_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
     assert final_state["extracted_data"]["policy_name"] == "Sample Scheme"
     assert final_state["extracted_data"]["citation_source_map"]
     assert final_state["audit_report"]["is_grounded"] is True
-    assert final_state["simplified_script"] == ""
-    assert final_state["audio_output_url"] == ""
+    assert final_state["simplified_script"]
+    assert final_state["voice_payload"]["language_code"] == "hi-IN"
+    assert final_state["audio_output_url"].startswith("/media/task-1")
 
 
 def test_graph_uses_preparsed_markdown_without_refetching(monkeypatch: pytest.MonkeyPatch) -> None:

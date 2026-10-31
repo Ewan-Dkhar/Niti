@@ -97,6 +97,7 @@ class AnalyzeResponse(BaseModel):
 class AnalysisResult(BaseModel):
     policy_data: PolicyExtraction
     audit_status: AuditResult
+    voice_payload: VoicePayload | None = None
     audio_url: str | None = None
 
 

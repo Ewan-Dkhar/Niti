@@ -6,10 +6,12 @@ Run locally:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.services.tts import media_dir
 
 settings = get_settings()
 
@@ -28,6 +30,9 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+# Synthesized voice notes are written here by the pipeline.
+app.mount("/media", StaticFiles(directory=media_dir(settings)), name="media")
 
 
 @app.get("/health", tags=["system"])

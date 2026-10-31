@@ -5,7 +5,15 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, status
 
 from app.agent.graph import run_analysis
-from app.schemas import AnalyzeRequest, AnalyzeResponse, TaskStatus
+from app.schemas import (
+    AnalysisResult,
+    AnalyzeRequest,
+    AnalyzeResponse,
+    AuditResult,
+    PolicyExtraction,
+    TaskStatus,
+    VoicePayload,
+)
 from app.store import task_store
 
 logger = logging.getLogger(__name__)
@@ -41,6 +49,22 @@ async def _process_document(task_id: str) -> None:
     record.audit_report = final_state.get("audit_report")
     record.simplified_script = final_state.get("simplified_script")
     record.audio_output_url = final_state.get("audio_output_url")
+
+    extracted_data = record.extracted_data or {}
+    audit_report = record.audit_report or {}
+    if not extracted_data or not audit_report:
+        record.status = TaskStatus.failed
+        record.error = "Pipeline finished without a grounded extraction"
+        return
+
+    voice_payload = final_state.get("voice_payload") or None
+    record.result = AnalysisResult(
+        policy_data=PolicyExtraction.model_validate(extracted_data),
+        audit_status=AuditResult.model_validate(audit_report),
+        voice_payload=VoicePayload.model_validate(voice_payload) if voice_payload else None,
+        audio_url=record.audio_output_url or None,
+    )
+    record.status = TaskStatus.completed
     logger.info(
         "Graph finished for task %s (parser=%s, pages=%s)",
         task_id,

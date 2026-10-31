@@ -16,6 +16,7 @@ dependencies = [
     "langgraph>=1.2.19",
     "anthropic>=2.3.0",
     "openai>=3.42.0",
+    "groq>=1.7.0",
 ]
 
 [dependency-groups]

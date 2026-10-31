@@ -9,9 +9,9 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - [x] Phase 4 — Hierarchical chunker + Qdrant hybrid index
 - [x] Phase 5 — LangGraph state machine skeleton
 - [x] Phase 6 — Rule extraction node
-- [ ] Phase 7 — Hallucination audit node
-- [ ] Phase 8 — Vernacular simplification
-- [ ] Phase 9 — Sarvam Bulbul v3 TTS
+- [x] Phase 7 — Hallucination audit node
+- [x] Phase 8 — Vernacular simplification
+- [x] Phase 9 — Sarvam Bulbul v3 TTS
 - [ ] Phase 10 — Citizen verification endpoint
 - [ ] Phase 11 — Live data endpoints
 - [ ] Phase 12 — Next.js frontend
@@ -27,3 +27,6 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - Phase 4: `pytest` 56 passed; ruff clean; live gazette chunked into 10 chunks and queried with multilingual-e5-large + BM25; "provident fund" returned the EPF inspection-charge table with page/clause citations.
 - Phase 5: `pytest` 62 passed; ruff clean; live graph run completed parse → extract → audit → simplify → voice with the expected stub state.
 - Phase 6: `pytest` 71 passed; ruff clean; mock provider extracted grounded fields + citations from the live gazette; Anthropic/OpenAI providers compile and are selected by key.
+- Phase 7: `pytest` 77 passed; ruff clean; fabricated amount/date/claim and missing-citation cases flagged; retry counter + correction guidance routed back to extraction.
+- Phase 8: `pytest` 86 passed; ruff clean; localized scripts generated for hi/ta/bn/te/en; mock provider also accepted as the graph's simplify step.
+- Phase 9: `pytest` 95 passed; ruff clean; mock WAV generated and written to `data/media/<task>.wav`; `/media` mounted; results endpoint now returns completed `AnalysisResult` with script, duration, and audio URL.

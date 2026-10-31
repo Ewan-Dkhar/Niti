@@ -35,8 +35,10 @@ def test_analyze_result_is_pollable() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["task_id"] == created["task_id"]
-    assert body["status"] == "processing"
-    assert body["result"] is None
+    assert body["status"] == "completed"
+    assert body["result"]["policy_data"]["policy_name"] == "Stub policy"
+    assert body["result"]["audit_status"]["is_grounded"] is True
+    assert body["result"]["audio_url"]
 
 
 def test_analyze_records_ingestion_metadata() -> None:
@@ -51,7 +53,9 @@ def test_analyze_records_ingestion_metadata() -> None:
     assert record.parser == "pypdf"
     assert record.page_count == 1
     assert record.parsed_markdown_path is not None
-    assert record.status is TaskStatus.processing
+    assert record.status is TaskStatus.completed
+    assert record.result is not None
+    assert record.audio_output_url
 
 
 def test_analyze_marks_task_failed_when_ingestion_fails(

@@ -19,13 +19,24 @@ schema. Follow these rules strictly:
 """
 
 
-def build_user_prompt(document_text: str, target_language: str) -> str:
+def build_user_prompt(
+    document_text: str,
+    target_language: str,
+    correction_guidance: str | None = None,
+) -> str:
+    guidance = ""
+    if correction_guidance:
+        guidance = (
+            "\nA previous extraction failed grounding checks. Apply this "
+            f"correction guidance:\n{correction_guidance}\n"
+        )
+
     return f"""Target language for downstream explainers: {target_language}
 
 Extract the policy into the PolicyExtraction schema from the document context
 below. The context contains citation labels in square brackets before each
 chunk. Use those labels in `citation_source_map`.
-
+{guidance}
 <document>
 {document_text}
 </document>
