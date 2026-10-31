@@ -60,3 +60,16 @@ def stub_document_parser(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         )
 
     monkeypatch.setattr("app.agent.nodes.parse.parse_document", fake_parse)
+
+
+@pytest.fixture(autouse=True)
+def mock_env_for_unit_tests(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Ensure standard unit tests stay offline and deterministic regardless of local .env."""
+    if "live" not in request.keywords:
+        monkeypatch.setenv("USE_MOCK_LLM", "true")
+        monkeypatch.setenv("USE_MOCK_TTS", "true")
+        from app.core.config import get_settings
+
+        get_settings.cache_clear()

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     simplification_model: str = "openai/gpt-oss-120b"
 
     sarvam_tts_model: str = "bulbul:v3"
-    sarvam_speaker: str = "anushka"
+    sarvam_speaker: str = "shreya"
 
     myscheme_api_url: str = "https://www.myscheme.gov.in/api/apisetu/schemes"
     pib_rss_url: str = "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3"

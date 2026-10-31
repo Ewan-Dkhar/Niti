@@ -138,7 +138,7 @@ class GroqSimplificationProvider:
                 response = client.chat.completions.create(
                     model=model,
                     temperature=0.3,
-                    max_tokens=900,
+                    max_tokens=2048,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {

@@ -24,7 +24,8 @@ from app.core.config import Settings, get_settings
 
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
 SARVAM_DEFAULT_MODEL = "bulbul:v3"
-SARVAM_DEFAULT_SPEAKER = "anushka"
+SARVAM_DEFAULT_SPEAKER = "shreya"
+SARVAM_FALLBACK_SPEAKERS = ("shreya", "priya", "aditya", "amit")
 SARVAM_MAX_CHARS = 2400
 SAMPLE_RATE = 22050
 WORDS_PER_SECOND = 2.5
@@ -157,11 +158,23 @@ class SarvamTTSProvider:
             "enable_preprocessing": True,
         }
         headers = {"api-subscription-key": self.api_key}
-        if self._client is not None:
-            response = self._client.post(SARVAM_TTS_URL, json=payload, headers=headers)
-        else:
+
+        def send_request(p: dict) -> httpx.Response:
+            if self._client is not None:
+                return self._client.post(SARVAM_TTS_URL, json=p, headers=headers)
             with httpx.Client(timeout=self.timeout_sec) as client:
-                response = client.post(SARVAM_TTS_URL, json=payload, headers=headers)
+                return client.post(SARVAM_TTS_URL, json=p, headers=headers)
+
+        response = send_request(payload)
+        if response.status_code == 400 and "not compatible with model" in response.text:
+            for fallback_speaker in SARVAM_FALLBACK_SPEAKERS:
+                if fallback_speaker != payload["speaker"]:
+                    payload["speaker"] = fallback_speaker
+                    fallback_resp = send_request(payload)
+                    if fallback_resp.is_success:
+                        response = fallback_resp
+                        break
+
         response.raise_for_status()
         body = response.json()
         audios = body.get("audios") or []

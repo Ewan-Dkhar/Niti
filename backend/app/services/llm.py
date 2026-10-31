@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 ANTHROPIC_DEFAULT_MODEL = "claude-3-5-sonnet-latest"
 OPENAI_DEFAULT_MODEL = "gpt-4o"
+GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
 GROQ_DEFAULT_EXTRACTION_MODEL = "openai/gpt-oss-120b"
 GROQ_FALLBACK_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile")
 
