@@ -13,7 +13,7 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - [x] Phase 8 — Vernacular simplification
 - [x] Phase 9 — Sarvam Bulbul v3 TTS
 - [x] Phase 10 — Citizen verification endpoint
-- [ ] Phase 11 — Live data endpoints
+- [x] Phase 11 — Live data endpoints
 - [ ] Phase 12 — Next.js frontend
 - [ ] Phase 13 — Resilience & cached fallbacks
 - [ ] Phase 14 — E2E test & packaging
@@ -31,3 +31,4 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - Phase 8: `pytest` 86 passed; ruff clean; localized scripts generated for hi/ta/bn/te/en; mock provider also accepted as the graph's simplify step.
 - Phase 9: `pytest` 95 passed; ruff clean; mock WAV generated and written to `data/media/<task>.wav`; `/media` mounted; results endpoint now returns completed `AnalysisResult` with script, duration, and audio URL.
 - Phase 10: `pytest` 104 passed; ruff clean; live gazette task returned a playable 51s WAV (`/media/<task>.wav`) and `/verify-citizen` matched cited clauses with document gap reporting.
+- Phase 11: `pytest` 112 passed; ruff clean; `/api/v1/sources` fetched 5,210 live myScheme schemes and the PIB RSS feed in 1.8s, then served cached results in 0.01s; per-source failures returned alongside partial results.

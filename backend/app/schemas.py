@@ -127,3 +127,21 @@ class VerifyCitizenResponse(BaseModel):
     is_eligible: bool
     matched_clauses: list[str]
     missing_documents: list[str]
+
+
+class SourceItem(BaseModel):
+    """One normalized item from a live government feed."""
+
+    source: Literal["myscheme", "pib"]
+    title: str
+    url: str
+    summary: str | None = None
+    published_at: str | None = None
+
+
+class SourcesResponse(BaseModel):
+    query: str = ""
+    items: list[SourceItem] = Field(default_factory=list)
+    errors: list[str] = Field(
+        default_factory=list, description="Per-source failures; other sources still returned"
+    )

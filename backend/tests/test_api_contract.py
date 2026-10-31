@@ -136,6 +136,12 @@ def test_verify_citizen_rejects_unknown_policy() -> None:
     assert response.status_code == 404
 
 
+def test_live_sources_endpoint_is_listed() -> None:
+    response = client.get("/openapi.json")
+
+    assert "/api/v1/sources" in response.json()["paths"]
+
+
 def test_openapi_schema_renders() -> None:
     response = client.get("/openapi.json")
 

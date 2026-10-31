@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     sarvam_tts_model: str = "bulbul:v3"
     sarvam_speaker: str = "anushka"
 
+    myscheme_api_url: str = "https://www.myscheme.gov.in/api/apisetu/schemes"
+    pib_rss_url: str = "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3"
+
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
     qdrant_path: str = "data/qdrant"
