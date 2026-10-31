@@ -1,4 +1,4 @@
-.PHONY: sync dev-backend dev-frontend test lint fmt verify-ingest verify-retrieval verify-graph clean
+.PHONY: sync dev-backend dev-frontend test test-live lint fmt build-frontend docker-up docker-down verify-ingest verify-retrieval verify-graph clean
 
 sync:
 	uv sync
@@ -12,11 +12,23 @@ dev-frontend:
 test:
 	uv run pytest
 
+test-live:
+	uv run pytest -m live
+
 lint:
-	uv run ruff check backend
+	uv run ruff check backend scripts
 
 fmt:
 	uv run ruff format backend scripts
+
+build-frontend:
+	cd frontend && npm run build
+
+docker-up:
+	docker compose up --build
+
+docker-down:
+	docker compose down
 
 verify-ingest:
 	uv run python scripts/verify_ingestion.py "$(URL)"

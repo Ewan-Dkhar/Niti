@@ -17,4 +17,5 @@ async def parse_document_node(state: AgentState) -> dict:
         "parser": parsed.parser,
         "page_count": parsed.page_count,
         "markdown_path": str(parsed.markdown_path) if parsed.markdown_path else None,
+        "from_cache": parsed.from_cache,
     }

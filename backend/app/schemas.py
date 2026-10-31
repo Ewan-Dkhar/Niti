@@ -99,6 +99,14 @@ class AnalysisResult(BaseModel):
     audit_status: AuditResult
     voice_payload: VoicePayload | None = None
     audio_url: str | None = None
+    audio_is_mock: bool = Field(
+        default=False,
+        description="True when local placeholder audio was produced instead of a real TTS call",
+    )
+    from_cache: bool = Field(
+        default=False,
+        description="True when the source was unreachable and a cached parse was used",
+    )
 
 
 class ResultResponse(BaseModel):

@@ -8,7 +8,9 @@ development and tests do not require the full Docling model stack.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
+import json
 import logging
 import tempfile
 from dataclasses import dataclass
@@ -39,6 +41,13 @@ class UnsupportedDocumentError(IngestionError):
     """The fetched resource is not a supported PDF document."""
 
 
+class _TransientFetchError(IngestionError):
+    """A retryable network or upstream failure."""
+
+
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
 @dataclass(frozen=True)
 class ParsedDocument:
     source_url: str
@@ -47,6 +56,7 @@ class ParsedDocument:
     parser: str
     fetched_at: datetime
     markdown_path: Path | None = None
+    from_cache: bool = False
 
 
 def validate_document_url(url: str) -> str:
@@ -56,14 +66,50 @@ def validate_document_url(url: str) -> str:
     return url
 
 
+async def _download_pdf(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    max_bytes: int,
+) -> tuple[bytes, str]:
+    try:
+        async with client.stream("GET", url) as response:
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                if status in RETRYABLE_STATUS:
+                    raise _TransientFetchError(f"upstream returned HTTP {status}") from exc
+                raise IngestionError(f"Failed to fetch document: {exc}") from exc
+
+            chunks: list[bytes] = []
+            total = 0
+            async for chunk in response.aiter_bytes():
+                total += len(chunk)
+                if total > max_bytes:
+                    raise IngestionError(
+                        f"PDF exceeds the {max_bytes // (1024 * 1024)} MB size limit"
+                    )
+                chunks.append(chunk)
+            return b"".join(chunks), response.headers.get("content-type", "unknown")
+    except httpx.RequestError as exc:
+        raise _TransientFetchError(f"network error: {exc}") from exc
+
+
 async def fetch_pdf(
     url: str,
     *,
     client: httpx.AsyncClient | None = None,
     timeout: float = 30.0,
     max_bytes: int = MAX_PDF_BYTES,
+    retries: int = 2,
+    backoff_sec: float = 0.75,
 ) -> bytes:
-    """Download a PDF with size limits and content sniffing."""
+    """Download a PDF with retries, size limits, and content sniffing.
+
+    Only transient failures (network errors, 429, and 5xx) are retried; a 404 or
+    an HTML login wall fails immediately so the caller can fall back to cache.
+    """
     validate_document_url(url)
 
     owns_client = client is None
@@ -78,29 +124,35 @@ async def fetch_pdf(
             },
         )
 
+    last_error: _TransientFetchError | None = None
     try:
-        async with client.stream("GET", url) as response:
-            response.raise_for_status()
-            chunks: list[bytes] = []
-            total = 0
-            async for chunk in response.aiter_bytes():
-                total += len(chunk)
-                if total > max_bytes:
-                    raise IngestionError(
-                        f"PDF exceeds the {max_bytes // (1024 * 1024)} MB size limit"
+        for attempt in range(retries + 1):
+            try:
+                data, content_type = await _download_pdf(client, url, max_bytes=max_bytes)
+            except _TransientFetchError as exc:
+                last_error = exc
+                if attempt < retries:
+                    logger.warning(
+                        "Fetch attempt %d/%d for %s failed (%s); retrying",
+                        attempt + 1,
+                        retries + 1,
+                        url,
+                        exc,
                     )
-                chunks.append(chunk)
-    except httpx.HTTPError as exc:
-        raise IngestionError(f"Failed to fetch document: {exc}") from exc
+                    await asyncio.sleep(backoff_sec * (2**attempt))
+                    continue
+                break
+
+            if PDF_MAGIC not in data[:1024]:
+                raise UnsupportedDocumentError(f"Expected a PDF, got content-type {content_type!r}")
+            return data
     finally:
         if owns_client:
             await client.aclose()
 
-    data = b"".join(chunks)
-    if PDF_MAGIC not in data[:1024]:
-        content_type = response.headers.get("content-type", "unknown")
-        raise UnsupportedDocumentError(f"Expected a PDF, got content-type {content_type!r}")
-    return data
+    raise IngestionError(
+        f"Failed to fetch document after {retries + 1} attempts: {last_error}"
+    ) from last_error
 
 
 def parse_with_pypdf(data: bytes) -> tuple[str, int]:
@@ -166,6 +218,71 @@ def persist_markdown(
     return destination
 
 
+def cache_key(document_url: str) -> str:
+    return hashlib.sha256(document_url.strip().encode("utf-8")).hexdigest()[:32]
+
+
+def cache_path(document_url: str, *, data_dir: str | Path = "data") -> Path:
+    return Path(data_dir) / "cache" / f"{cache_key(document_url)}.json"
+
+
+def write_document_cache(
+    parsed: ParsedDocument,
+    *,
+    data_dir: str | Path = "data",
+) -> Path:
+    """Store the parsed result so an unreachable source can still be explained."""
+    destination = cache_path(parsed.source_url, data_dir=data_dir)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "source_url": parsed.source_url,
+        "markdown": parsed.markdown,
+        "page_count": parsed.page_count,
+        "parser": parsed.parser,
+        "fetched_at": parsed.fetched_at.isoformat(),
+    }
+    destination.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return destination
+
+
+def read_document_cache(
+    document_url: str,
+    *,
+    data_dir: str | Path = "data",
+) -> ParsedDocument | None:
+    source = cache_path(document_url, data_dir=data_dir)
+    if not source.exists():
+        return None
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        return ParsedDocument(
+            source_url=payload["source_url"],
+            markdown=payload["markdown"],
+            page_count=int(payload["page_count"]),
+            parser=str(payload["parser"]),
+            fetched_at=datetime.fromisoformat(payload["fetched_at"]),
+            from_cache=True,
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        logger.warning("Ignoring unreadable document cache at %s", source)
+        return None
+
+
+def _with_markdown_path(
+    parsed: ParsedDocument, *, task_id: str, data_dir: str | Path
+) -> ParsedDocument:
+    path = persist_markdown(task_id, parsed, data_dir=data_dir)
+    return ParsedDocument(
+        source_url=parsed.source_url,
+        markdown=parsed.markdown,
+        page_count=parsed.page_count,
+        parser=parsed.parser,
+        fetched_at=parsed.fetched_at,
+        markdown_path=path,
+        from_cache=parsed.from_cache,
+    )
+
+
 async def parse_document(
     document_url: str,
     *,
@@ -173,9 +290,29 @@ async def parse_document(
     settings: Settings | None = None,
     client: httpx.AsyncClient | None = None,
 ) -> ParsedDocument:
-    """Fetch and parse a PDF, persisting markdown for downstream phases."""
+    """Fetch and parse a PDF, falling back to a cached copy when needed."""
     settings = settings or get_settings()
-    data = await fetch_pdf(document_url, client=client)
+
+    if settings.offline_mode:
+        cached = read_document_cache(document_url, data_dir=settings.data_dir)
+        if cached is None:
+            raise IngestionError("Offline mode is on and this document has no cache entry yet")
+        logger.info("Serving %s from cache (offline mode)", document_url)
+        return await asyncio.to_thread(
+            _with_markdown_path, cached, task_id=task_id, data_dir=settings.data_dir
+        )
+
+    try:
+        data = await fetch_pdf(document_url, client=client)
+    except IngestionError as exc:
+        cached = read_document_cache(document_url, data_dir=settings.data_dir)
+        if cached is None:
+            raise
+        logger.warning("Live fetch failed (%s); serving cached copy of %s", exc, document_url)
+        return await asyncio.to_thread(
+            _with_markdown_path, cached, task_id=task_id, data_dir=settings.data_dir
+        )
+
     markdown, page_count, parser = await asyncio.to_thread(
         parse_pdf_bytes, data, use_docling=settings.use_docling
     )
@@ -187,12 +324,7 @@ async def parse_document(
         parser=parser,
         fetched_at=datetime.now(UTC),
     )
-    path = await asyncio.to_thread(persist_markdown, task_id, parsed, data_dir=settings.data_dir)
-    return ParsedDocument(
-        source_url=parsed.source_url,
-        markdown=parsed.markdown,
-        page_count=parsed.page_count,
-        parser=parsed.parser,
-        fetched_at=parsed.fetched_at,
-        markdown_path=path,
+    await asyncio.to_thread(write_document_cache, parsed, data_dir=settings.data_dir)
+    return await asyncio.to_thread(
+        _with_markdown_path, parsed, task_id=task_id, data_dir=settings.data_dir
     )

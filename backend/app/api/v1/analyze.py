@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, status
 
 from app.agent.graph import run_analysis
+from app.core.config import get_settings
 from app.schemas import (
     AnalysisResult,
     AnalyzeRequest,
@@ -45,6 +46,7 @@ async def _process_document(task_id: str) -> None:
     record.parsed_markdown_path = final_state.get("markdown_path")
     record.parser = final_state.get("parser")
     record.page_count = final_state.get("page_count")
+    record.from_cache = bool(final_state.get("from_cache"))
     record.extracted_data = final_state.get("extracted_data")
     record.audit_report = final_state.get("audit_report")
     record.simplified_script = final_state.get("simplified_script")
@@ -58,11 +60,14 @@ async def _process_document(task_id: str) -> None:
         return
 
     voice_payload = final_state.get("voice_payload") or None
+    settings = get_settings()
     record.result = AnalysisResult(
         policy_data=PolicyExtraction.model_validate(extracted_data),
         audit_status=AuditResult.model_validate(audit_report),
         voice_payload=VoicePayload.model_validate(voice_payload) if voice_payload else None,
         audio_url=record.audio_output_url or None,
+        audio_is_mock=settings.use_mock_tts or not settings.sarvam_api_key,
+        from_cache=record.from_cache,
     )
     record.status = TaskStatus.completed
     logger.info(

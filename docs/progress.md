@@ -14,9 +14,9 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - [x] Phase 9 — Sarvam Bulbul v3 TTS
 - [x] Phase 10 — Citizen verification endpoint
 - [x] Phase 11 — Live data endpoints
-- [ ] Phase 12 — Next.js frontend
-- [ ] Phase 13 — Resilience & cached fallbacks
-- [ ] Phase 14 — E2E test & packaging
+- [x] Phase 12 — Next.js frontend
+- [x] Phase 13 — Resilience & cached fallbacks
+- [x] Phase 14 — E2E test & packaging
 
 ## Verification log
 
@@ -32,3 +32,6 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - Phase 9: `pytest` 95 passed; ruff clean; mock WAV generated and written to `data/media/<task>.wav`; `/media` mounted; results endpoint now returns completed `AnalysisResult` with script, duration, and audio URL.
 - Phase 10: `pytest` 104 passed; ruff clean; live gazette task returned a playable 51s WAV (`/media/<task>.wav`) and `/verify-citizen` matched cited clauses with document gap reporting.
 - Phase 11: `pytest` 112 passed; ruff clean; `/api/v1/sources` fetched 5,210 live myScheme schemes and the PIB RSS feed in 1.8s, then served cached results in 0.01s; per-source failures returned alongside partial results.
+- Phase 12: Next.js 14 + Tailwind build clean (type-check and ESLint); document intake, polling, grounding stamp, script, WaveSurfer player, citation drawer, eligibility desk, and live sources implemented; 1440px and 390px browser passes recorded.
+- Phase 13: `pytest` 121 passed; transient 503/network fetch retried, 404 not retried; live parse cached, then served with `from_cache=true` under `OFFLINE_MODE=true`; TTS reused by text+language hash; PIB/myScheme stale caches served on refresh failure.
+- Phase 14: `pytest` 121 passed + 3 live E2E tests (Labour gazette, DPIIT BHAVYA, Textiles Tex-RAMPS) completed with grounded audits and playable WAVs; backend/frontend Dockerfiles, Compose with Qdrant, Makefile targets, and README runbook added.

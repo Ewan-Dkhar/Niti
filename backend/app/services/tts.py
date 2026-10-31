@@ -8,8 +8,10 @@ Sarvam Bulbul v3 and normalizes the response to WAV bytes.
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import math
+import shutil
 import struct
 import wave
 from dataclasses import dataclass
@@ -199,3 +201,43 @@ def write_audio(task_id: str, result: TTSResult, settings: Settings | None = Non
     destination = media_dir(settings) / f"{task_id}.{result.extension}"
     destination.write_bytes(result.audio_bytes)
     return f"/media/{destination.name}"
+
+
+def audio_cache_path(
+    text: str,
+    language_code: str,
+    settings: Settings | None = None,
+) -> Path:
+    digest = hashlib.sha256(
+        f"{settings.sarvam_tts_model}:{settings.sarvam_speaker}\0{language_code}\0{text}".encode()
+    ).hexdigest()[:40]
+    directory = media_dir(settings) / "cache"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / f"{digest}.wav"
+
+
+def synthesize_and_store(
+    task_id: str,
+    text: str,
+    language_code: str,
+    settings: Settings | None = None,
+) -> tuple[str, int, bool]:
+    """Return ``(url, duration_sec, from_cache)``, reusing audio when possible."""
+    settings = settings or get_settings()
+    directory = media_dir(settings)
+    destination = directory / f"{task_id}.wav"
+    cached = audio_cache_path(text, language_code, settings)
+
+    if destination.exists():
+        audio = destination.read_bytes()
+        return f"/media/{destination.name}", _wav_duration(audio), True
+
+    if cached.exists():
+        shutil.copyfile(cached, destination)
+        audio = destination.read_bytes()
+        return f"/media/{destination.name}", _wav_duration(audio), True
+
+    result = get_tts_provider(settings).synthesize(text, language_code)
+    destination.write_bytes(result.audio_bytes)
+    cached.write_bytes(result.audio_bytes)
+    return f"/media/{destination.name}", result.duration_sec, False

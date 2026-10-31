@@ -3,6 +3,7 @@
 import httpx
 import pytest
 
+from app.services import sources as sources_module
 from app.services.sources import (
     SourceError,
     clear_source_cache,
@@ -134,3 +135,44 @@ def test_collect_sources_reports_both_failures() -> None:
 
     assert items == []
     assert errors == ["down", "down"]
+
+
+def test_pib_retries_a_transient_status() -> None:
+    calls = {"count": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return httpx.Response(503, text="busy")
+        return httpx.Response(200, text=PIB_XML)
+
+    items = fetch_pib_updates(limit=5, client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+    assert calls["count"] == 2
+    assert len(items) == 2
+
+
+def test_pib_serves_stale_cache_when_refresh_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sources_module._pib_cache, "ttl_sec", 0)
+    fetch_pib_updates(limit=5, client=make_client())
+
+    items = fetch_pib_updates(limit=5, client=make_client(fail=True))
+
+    assert len(items) == 2
+    assert items[0].source == "pib"
+
+
+def test_myscheme_serves_stale_cache_when_refresh_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sources_module._scheme_cache, "ttl_sec", 0)
+    search_myscheme("kisan", limit=5, client=make_client())
+
+    items = search_myscheme("kisan", limit=5, client=make_client(fail=True))
+
+    assert [item.title for item in items] == [
+        "Kisan Credit Card",
+        "Pradhan Mantri Kisan Samman Nidhi",
+    ]

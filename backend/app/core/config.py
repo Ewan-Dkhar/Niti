@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     data_dir: str = "data"
 
     anthropic_api_key: str | None = None
@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     use_mock_llm: bool = True
     use_mock_tts: bool = True
     use_docling: bool = False
+    offline_mode: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

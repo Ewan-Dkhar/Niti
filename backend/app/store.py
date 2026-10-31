@@ -21,6 +21,7 @@ class TaskRecord:
     parsed_markdown_path: str | None = None
     parser: str | None = None
     page_count: int | None = None
+    from_cache: bool = False
     extracted_data: dict | None = None
     audit_report: dict | None = None
     simplified_script: str | None = None

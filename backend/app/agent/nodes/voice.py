@@ -3,7 +3,7 @@
 import logging
 
 from app.agent.state import AgentState
-from app.services.tts import TTSError, get_tts_provider, write_audio
+from app.services.tts import TTSError, synthesize_and_store
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +17,19 @@ def synthesize_voice_node(state: AgentState) -> dict:
     task_id = state.get("task_id", "document")
 
     try:
-        result = get_tts_provider().synthesize(script, language_code)
-    except TTSError:
+        url, duration, from_cache = synthesize_and_store(task_id, script, language_code)
+    except (TTSError, OSError):
         logger.exception("Voice synthesis failed for task %s", task_id)
         return {"audio_output_url": ""}
 
-    url = write_audio(task_id, result)
     payload = dict(state.get("voice_payload") or {})
     payload["audio_base64"] = None
-    payload["duration_estimate_sec"] = result.duration_sec
+    payload["duration_estimate_sec"] = duration
 
     logger.info(
-        "Synthesized %.1fs of %s audio for task %s", result.duration_sec, language_code, task_id
+        "Voice ready for task %s (%.0fs, %s)",
+        task_id,
+        duration,
+        "cached" if from_cache else "synthesized",
     )
     return {"audio_output_url": url, "voice_payload": payload}

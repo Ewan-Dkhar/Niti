@@ -42,13 +42,14 @@ class TTLCache(Generic[T]):
         self.ttl_sec = ttl_sec
         self._entries: dict[str, tuple[float, T]] = {}
 
-    def get(self, key: str) -> T | None:
+    def get(self, key: str, *, allow_stale: bool = False) -> T | None:
         entry = self._entries.get(key)
         if entry is None:
             return None
         stored_at, value = entry
         if time.monotonic() - stored_at > self.ttl_sec:
-            self._entries.pop(key, None)
+            if allow_stale:
+                return value
             return None
         return value
 
@@ -84,10 +85,26 @@ def _strip_html(value: str | None) -> str | None:
     return text or None
 
 
-def _get(client: httpx.Client, url: str) -> httpx.Response:
-    response = client.get(url, headers={"User-Agent": USER_AGENT})
-    response.raise_for_status()
-    return response
+def _get(client: httpx.Client, url: str, *, retries: int = 1) -> httpx.Response:
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            response = client.get(url, headers={"User-Agent": USER_AGENT})
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as exc:
+            retryable = exc.response.status_code in {429, 500, 502, 503, 504}
+            last_error = exc
+            if not retryable or attempt >= retries:
+                raise
+        except httpx.RequestError as exc:
+            last_error = exc
+            if attempt >= retries:
+                raise
+        time.sleep(0.4 * (2**attempt))
+
+    assert last_error is not None
+    raise last_error
 
 
 def _parse_pib(xml_text: str) -> list[SourceItem]:
@@ -126,6 +143,10 @@ def fetch_pib_updates(
             response = _get(http, settings.pib_rss_url)
             items = _parse_pib(response.text)
         except (httpx.HTTPError, ET.ParseError) as exc:
+            stale = _pib_cache.get("pib", allow_stale=True)
+            if stale:
+                logger.warning("PIB RSS refresh failed (%s); serving cached copy", exc)
+                return stale[:limit]
             logger.warning("PIB RSS refresh failed: %s", exc)
             raise SourceError(f"PIB RSS unavailable: {exc}") from exc
         finally:
@@ -151,6 +172,10 @@ def _load_schemes(
         response = _get(http, settings.myscheme_api_url)
         payload = response.json()
     except (httpx.HTTPError, ValueError) as exc:
+        stale = _scheme_cache.get("schemes", allow_stale=True)
+        if stale:
+            logger.warning("myScheme refresh failed (%s); serving cached copy", exc)
+            return stale
         logger.warning("myScheme refresh failed: %s", exc)
         raise SourceError(f"myScheme unavailable: {exc}") from exc
     finally:

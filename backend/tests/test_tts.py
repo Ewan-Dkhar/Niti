@@ -16,6 +16,7 @@ from app.services.tts import (
     TTSError,
     estimate_duration,
     get_tts_provider,
+    synthesize_and_store,
     write_audio,
 )
 
@@ -116,3 +117,22 @@ def test_sarvam_provider_raises_without_audio() -> None:
 
     with pytest.raises(TTSError):
         provider.synthesize("hello", "en-IN")
+
+
+def test_synthesize_and_store_reuses_audio_for_same_text(tmp_path: Path) -> None:
+    settings = Settings(data_dir=str(tmp_path))
+    text = "एक ही पाठ के लिए दोबारा ऑडियो नहीं बनना चाहिए।"
+
+    first_url, first_duration, first_cached = synthesize_and_store(
+        "task-a", text, "hi-IN", settings
+    )
+    second_url, second_duration, second_cached = synthesize_and_store(
+        "task-b", text, "hi-IN", settings
+    )
+
+    assert first_cached is False
+    assert second_cached is True
+    assert first_url == "/media/task-a.wav"
+    assert second_url == "/media/task-b.wav"
+    assert first_duration == second_duration
+    assert (tmp_path / "media" / "task-b.wav").exists()

@@ -13,6 +13,7 @@ class AgentState(TypedDict, total=False):
     parser: str
     page_count: int
     markdown_path: str | None
+    from_cache: bool
 
     # Extraction + audit
     retrieved_context: list[str]
