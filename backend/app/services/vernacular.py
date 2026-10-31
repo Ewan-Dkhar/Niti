@@ -12,7 +12,8 @@ from app.schemas import PolicyExtraction
 
 logger = logging.getLogger(__name__)
 
-GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
+GROQ_FALLBACK_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile")
 
 TEMPLATES: dict[str, dict[str, str]] = {
     "hi-IN": {
@@ -119,28 +120,51 @@ class GroqSimplificationProvider:
         self.model = model
 
     def simplify(self, policy: PolicyExtraction, language_code: str) -> str:
-        from groq import Groq
+        from groq import Groq, NotFoundError
 
         client = Groq(api_key=self.api_key)
-        response = client.chat.completions.create(
-            model=self.model,
-            temperature=0.3,
-            max_tokens=900,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": build_user_prompt(
-                        json.dumps(policy.model_dump(), ensure_ascii=False),
-                        language_code,
-                    ),
-                },
-            ],
-        )
-        content = response.choices[0].message.content
-        if not content or not content.strip():
-            raise SimplificationError("Groq returned an empty script")
-        return content.strip()
+        models_to_try = [self.model]
+        for fallback in GROQ_FALLBACK_MODELS:
+            if fallback not in models_to_try:
+                models_to_try.append(fallback)
+
+        last_error: Exception | None = None
+        for model in models_to_try:
+            try:
+                extra_kwargs = {}
+                if "gpt-oss" in model:
+                    extra_kwargs["reasoning_format"] = "hidden"
+
+                response = client.chat.completions.create(
+                    model=model,
+                    temperature=0.3,
+                    max_tokens=900,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": build_user_prompt(
+                                json.dumps(policy.model_dump(), ensure_ascii=False),
+                                language_code,
+                            ),
+                        },
+                    ],
+                    **extra_kwargs,
+                )
+                content = response.choices[0].message.content
+                if not content or not content.strip():
+                    raise SimplificationError("Groq returned an empty script")
+                return content.strip()
+            except NotFoundError as exc:
+                logger.warning("Groq model %s not available, attempting fallback: %s", model, exc)
+                last_error = exc
+                continue
+            except Exception as exc:
+                if isinstance(exc, SimplificationError):
+                    raise
+                raise SimplificationError(f"Groq simplification failed: {exc}") from exc
+
+        raise SimplificationError(f"Groq simplification failed across models: {last_error}")
 
 
 def get_simplification_provider(

@@ -6,10 +6,13 @@ from app.agent.nodes.extract import extract_rules_node, select_context
 from app.core.config import Settings
 from app.services.llm import (
     AnthropicExtractionProvider,
+    ExtractionError,
+    GroqExtractionProvider,
     MockExtractionProvider,
     OpenAIExtractionProvider,
     get_extraction_provider,
     heuristic_extract,
+    normalize_citations,
 )
 
 SAMPLE_MARKDOWN = """<!-- page 1 -->
@@ -134,3 +137,136 @@ def test_provider_factory_selects_openai_by_key() -> None:
     )
 
     assert isinstance(provider, OpenAIExtractionProvider)
+
+
+def test_provider_factory_selects_groq_by_key() -> None:
+    provider = get_extraction_provider(
+        Settings(
+            use_mock_llm=False,
+            extraction_provider="auto",
+            groq_api_key="test-key",
+        )
+    )
+
+    assert isinstance(provider, GroqExtractionProvider)
+
+
+def test_provider_factory_selects_groq_explicitly() -> None:
+    provider = get_extraction_provider(
+        Settings(
+            use_mock_llm=False,
+            extraction_provider="groq",
+            groq_api_key="test-key",
+        )
+    )
+
+    assert isinstance(provider, GroqExtractionProvider)
+
+
+def test_provider_factory_raises_when_groq_key_missing() -> None:
+    with pytest.raises(ExtractionError, match="EXTRACTION_PROVIDER=groq requires GROQ_API_KEY"):
+        get_extraction_provider(
+            Settings(
+                use_mock_llm=False,
+                extraction_provider="groq",
+                groq_api_key=None,
+            )
+        )
+
+
+def test_provider_factory_raises_for_unknown_provider() -> None:
+    with pytest.raises(ExtractionError, match="Unknown extraction provider"):
+        get_extraction_provider(
+            Settings(
+                use_mock_llm=False,
+                extraction_provider="unsupported_provider",
+            )
+        )
+
+
+def test_normalize_citations_canonicalizes_keys() -> None:
+    from app.schemas import PolicyExtraction
+
+    policy = PolicyExtraction(
+        policy_name="Scheme A",
+        issuing_authority="Ministry B",
+        gazette_or_order_no=None,
+        effective_date=None,
+        target_beneficiaries=["Urban workers"],
+        mandatory_eligibility=["Income below 3 lakh", "Age above 18"],
+        disqualifications=[],
+        direct_benefits=["Subsidy of 10000"],
+        penalty_or_deadlines=[],
+        required_documents=["Aadhaar"],
+        citation_source_map={
+            "policy_name": "Page 1",
+            "issuing_authority": "Page 1",
+            "target_beneficiaries.1": "Page 1, Clause 1",
+            "mandatory_eligibility_1": "Page 1, Clause 2",
+            "mandatory_eligibility[2]": "Page 1, Clause 3",
+            "direct_benefits.1": "Page 2, Clause 4",
+            "Aadhaar": "Page 2, Clause 5",
+        },
+    )
+
+    normalized = normalize_citations(policy)
+    citations = normalized.citation_source_map
+    assert citations["policy_name"] == "Page 1"
+    assert citations["issuing_authority"] == "Page 1"
+    assert citations["target_beneficiaries[0]"] == "Page 1, Clause 1"
+    assert citations["mandatory_eligibility[0]"] == "Page 1, Clause 2"
+    assert citations["mandatory_eligibility[1]"] == "Page 1, Clause 3"
+    assert citations["direct_benefits[0]"] == "Page 2, Clause 4"
+    assert citations["required_documents[0]"] == "Page 2, Clause 5"
+
+
+def test_groq_extraction_provider_parses_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+    from types import SimpleNamespace
+
+    extracted_payload = {
+        "policy_name": "Test Groq Policy",
+        "issuing_authority": "Ministry of Tests",
+        "gazette_or_order_no": "123",
+        "effective_date": "2026-01-01",
+        "target_beneficiaries": ["Citizens"],
+        "mandatory_eligibility": ["Must be eligible"],
+        "disqualifications": [],
+        "direct_benefits": ["Grant of 5000"],
+        "penalty_or_deadlines": [],
+        "required_documents": ["ID card"],
+        "citation_source_map": {
+            "policy_name": "Page 1",
+            "issuing_authority": "Page 1",
+            "target_beneficiaries[0]": "Page 1",
+            "mandatory_eligibility[0]": "Page 1",
+            "direct_benefits[0]": "Page 1",
+            "required_documents[0]": "Page 1",
+        },
+    }
+
+    mock_tool_call = SimpleNamespace(
+        function=SimpleNamespace(arguments=json.dumps(extracted_payload))
+    )
+    mock_choice = SimpleNamespace(
+        message=SimpleNamespace(tool_calls=[mock_tool_call], content=None)
+    )
+    mock_response = SimpleNamespace(choices=[mock_choice])
+
+    class MockCompletions:
+        def create(self, *args: object, **kwargs: object) -> object:
+            return mock_response
+
+    class MockGroqClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.chat = SimpleNamespace(completions=MockCompletions())
+
+    monkeypatch.setattr("groq.Groq", MockGroqClient)
+
+    provider = GroqExtractionProvider(api_key="test-key")
+    result = provider.extract(document_text="Sample text", target_language="en-IN")
+
+    assert result.policy_name == "Test Groq Policy"
+    assert result.issuing_authority == "Ministry of Tests"
+    assert result.target_beneficiaries == ["Citizens"]
+    assert result.citation_source_map["target_beneficiaries[0]"] == "Page 1"

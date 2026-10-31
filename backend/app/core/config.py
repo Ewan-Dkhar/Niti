@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     extraction_provider: str = "auto"
     extraction_model: str | None = None
-    simplification_model: str = "llama-3.3-70b-versatile"
+    simplification_model: str = "openai/gpt-oss-120b"
 
     sarvam_tts_model: str = "bulbul:v3"
     sarvam_speaker: str = "anushka"

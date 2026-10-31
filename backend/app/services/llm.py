@@ -13,12 +13,15 @@ from typing import Protocol
 from app.core.config import Settings, get_settings
 from app.prompts.extraction import SYSTEM_PROMPT, build_user_prompt
 from app.schemas import PolicyExtraction
+from app.services.audit import LIST_FIELDS, SCALAR_FIELDS
 from app.services.chunker import chunk_markdown
 
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_DEFAULT_MODEL = "claude-3-5-sonnet-latest"
 OPENAI_DEFAULT_MODEL = "gpt-4o"
+GROQ_DEFAULT_EXTRACTION_MODEL = "openai/gpt-oss-120b"
+GROQ_FALLBACK_MODELS = ("openai/gpt-oss-120b", "qwen/qwen3.8-27b", "llama-3.3-70b-versatile")
 
 AUTHORITY_RE = re.compile(
     r"(?im)^\s*(?:ministry|department|government of india|भारत सरकार|मंत्रालय|विभाग)"
@@ -294,7 +297,7 @@ class AnthropicExtractionProvider:
 
         for block in response.content:
             if getattr(block, "type", None) == "tool_use":
-                return PolicyExtraction.model_validate(block.input)
+                return normalize_citations(PolicyExtraction.model_validate(block.input))
 
         raise ExtractionError("Anthropic response did not include structured output")
 
@@ -334,7 +337,146 @@ class OpenAIExtractionProvider:
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ExtractionError("OpenAI response did not include structured output")
-        return parsed
+        return normalize_citations(parsed)
+
+
+def normalize_citations(extraction: PolicyExtraction) -> PolicyExtraction:
+    """Normalize extracted citations to canonical field and field[index] keys."""
+    raw = dict(extraction.citation_source_map)
+    normalized: dict[str, str] = {}
+
+    for field in SCALAR_FIELDS:
+        val = getattr(extraction, field, None)
+        if not val or val.lower() in ("not stated in document", "untitled policy"):
+            continue
+        if field in raw:
+            normalized[field] = raw[field]
+        elif val in raw:
+            normalized[field] = raw[val]
+        else:
+            for k, v in raw.items():
+                if k.lower() in field.lower() or field.lower() in k.lower():
+                    normalized[field] = v
+                    break
+
+    for field in LIST_FIELDS:
+        items = getattr(extraction, field, []) or []
+        for i, item in enumerate(items):
+            canonical = f"{field}[{i}]"
+            if canonical in raw:
+                normalized[canonical] = raw[canonical]
+                continue
+            candidates = [
+                f"{field}[{i + 1}]",
+                f"{field}.{i}",
+                f"{field}.{i + 1}",
+                f"{field}_{i}",
+                f"{field}_{i + 1}",
+                f"{field}-{i}",
+                f"{field}-{i + 1}",
+            ]
+            matched = False
+            for c in candidates:
+                if c in raw:
+                    normalized[canonical] = raw[c]
+                    matched = True
+                    break
+            if matched:
+                continue
+            if field in raw:
+                normalized[canonical] = raw[field]
+                continue
+            if item in raw:
+                normalized[canonical] = raw[item]
+                continue
+            for k, v in raw.items():
+                if (k.lower() in item.lower() or item.lower() in k.lower()) and len(k) > 4:
+                    normalized[canonical] = v
+                    break
+
+    for k, v in raw.items():
+        if k not in normalized:
+            normalized[k] = v
+
+    return extraction.model_copy(update={"citation_source_map": normalized})
+
+
+class GroqExtractionProvider:
+    def __init__(self, api_key: str, model: str = GROQ_DEFAULT_EXTRACTION_MODEL) -> None:
+        self.api_key = api_key
+        self.model = model
+
+    def extract(
+        self,
+        *,
+        document_text: str,
+        target_language: str,
+        correction_guidance: str | None = None,
+    ) -> PolicyExtraction:
+        from groq import Groq, NotFoundError
+
+        client = Groq(api_key=self.api_key)
+        models_to_try = [self.model]
+        for fallback in GROQ_FALLBACK_MODELS:
+            if fallback not in models_to_try:
+                models_to_try.append(fallback)
+
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "policy_extraction",
+                    "description": "Return the grounded PolicyExtraction object.",
+                    "parameters": PolicyExtraction.model_json_schema(),
+                },
+            }
+        ]
+
+        last_error: Exception | None = None
+        for model in models_to_try:
+            try:
+                extra_kwargs = {}
+                if "gpt-oss" in model:
+                    extra_kwargs["reasoning_format"] = "hidden"
+
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": build_user_prompt(
+                                document_text, target_language, correction_guidance
+                            ),
+                        },
+                    ],
+                    tools=tools,
+                    tool_choice={"type": "function", "function": {"name": "policy_extraction"}},
+                    max_tokens=4096,
+                    **extra_kwargs,
+                )
+
+                choice = response.choices[0].message
+                if choice.tool_calls:
+                    arguments = choice.tool_calls[0].function.arguments
+                    extraction = PolicyExtraction.model_validate_json(arguments)
+                    return normalize_citations(extraction)
+
+                if choice.content:
+                    extraction = PolicyExtraction.model_validate_json(choice.content)
+                    return normalize_citations(extraction)
+
+                raise ExtractionError("Groq response did not include structured output")
+            except NotFoundError as exc:
+                logger.warning("Groq model %s not available, attempting fallback: %s", model, exc)
+                last_error = exc
+                continue
+            except Exception as exc:
+                if isinstance(exc, ExtractionError):
+                    raise
+                raise ExtractionError(f"Groq extraction failed: {exc}") from exc
+
+        raise ExtractionError(f"Groq extraction failed across models: {last_error}")
 
 
 def get_extraction_provider(settings: Settings | None = None) -> ExtractionProvider:
@@ -358,6 +500,20 @@ def get_extraction_provider(settings: Settings | None = None) -> ExtractionProvi
         return OpenAIExtractionProvider(
             api_key=settings.openai_api_key,
             model=settings.extraction_model or OPENAI_DEFAULT_MODEL,
+        )
+
+    if choice == "groq" or (choice == "auto" and settings.groq_api_key):
+        if not settings.groq_api_key:
+            raise ExtractionError("EXTRACTION_PROVIDER=groq requires GROQ_API_KEY")
+        return GroqExtractionProvider(
+            api_key=settings.groq_api_key,
+            model=settings.extraction_model or GROQ_DEFAULT_EXTRACTION_MODEL,
+        )
+
+    if choice != "auto":
+        raise ExtractionError(
+            f"Unknown extraction provider '{settings.extraction_provider}'. "
+            "Supported providers: auto, anthropic, openai, groq, mock."
         )
 
     return MockExtractionProvider()

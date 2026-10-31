@@ -102,10 +102,10 @@ Copy `.env.example` to `.env`. Every flag has a safe default.
 | `USE_MOCK_TTS` | `true` | Local WAV placeholder instead of Sarvam |
 | `USE_DOCLING` | `false` | Docling layout parser; pypdf fallback when off |
 | `OFFLINE_MODE` | `false` | Serve parsed documents only from `data/cache` |
-| `EXTRACTION_PROVIDER` | `auto` | `anthropic`, `openai`, `mock`, or auto-by-key |
+| `EXTRACTION_PROVIDER` | `auto` | `anthropic`, `openai`, `groq`, `mock`, or auto-by-key |
 | `ANTHROPIC_API_KEY` | — | Enables Claude extraction |
 | `OPENAI_API_KEY` | — | Enables GPT extraction |
-| `GROQ_API_KEY` | — | Enables Llama 3.3 vernacular scripts |
+| `GROQ_API_KEY` | — | Enables Groq extraction & vernacular scripts |
 | `SARVAM_API_KEY` | — | Enables real Bulbul v3 speech |
 | `QDRANT_URL` / `QDRANT_PATH` | local path | Hybrid retrieval backend |
 

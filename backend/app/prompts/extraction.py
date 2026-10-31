@@ -11,11 +11,14 @@ schema. Follow these rules strictly:
 2. Prefer exact wording from the document. You may shorten long sentences, but
    do not change their meaning.
 3. For each extracted rule, record the page and section/clause shown in the
-   context, using the citation labels provided (e.g. "Section 4, clause 2 (page 3)").
+   context, using the citation labels provided in square brackets (e.g. "[page 1, clause 2]").
 4. If the document does not state a field, return an empty list (or null for the
-   optional gazette number/date) instead of guessing.
-5. Keep monetary amounts, percentages, and dates exactly as they appear.
-6. Do not merge separate eligibility conditions into one item.
+   optional gazette circular number or date) instead of guessing.
+5. In `citation_source_map`, every extracted claim must map to its citation label:
+   - For scalar fields: exact name (e.g. 'policy_name', 'issuing_authority').
+   - For list fields: 0-indexed bracket key (e.g. 'mandatory_eligibility[0]').
+6. Keep monetary amounts, percentages, and dates exactly as they appear in the source text.
+7. Do not merge separate eligibility conditions into one item.
 """
 
 
