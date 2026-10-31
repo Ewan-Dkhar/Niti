@@ -60,7 +60,7 @@ def test_analyze_marks_task_failed_when_ingestion_fails(
     async def failing_parse(document_url: str, *, task_id: str, **kwargs: object) -> None:
         raise IngestionError("blocked by upstream")
 
-    monkeypatch.setattr("app.api.v1.analyze.parse_document", failing_parse)
+    monkeypatch.setattr("app.agent.nodes.parse.parse_document", failing_parse)
 
     created = client.post(
         "/api/v1/analyze",

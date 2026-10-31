@@ -1,4 +1,4 @@
-.PHONY: sync dev-backend dev-frontend test lint fmt verify-ingest verify-retrieval clean
+.PHONY: sync dev-backend dev-frontend test lint fmt verify-ingest verify-retrieval verify-graph clean
 
 sync:
 	uv sync
@@ -23,6 +23,9 @@ verify-ingest:
 
 verify-retrieval:
 	uv run python scripts/verify_retrieval.py "$(URL)" "$(QUERY)"
+
+verify-graph:
+	uv run python scripts/verify_graph.py "$(URL)"
 
 clean:
 	rm -rf .venv .pytest_cache .ruff_cache

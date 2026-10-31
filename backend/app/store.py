@@ -21,6 +21,10 @@ class TaskRecord:
     parsed_markdown_path: str | None = None
     parser: str | None = None
     page_count: int | None = None
+    extracted_data: dict | None = None
+    audit_report: dict | None = None
+    simplified_script: str | None = None
+    audio_output_url: str | None = None
     result: AnalysisResult | None = None
     error: str | None = None
 

@@ -59,4 +59,4 @@ def stub_document_parser(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
             markdown_path=markdown_path,
         )
 
-    monkeypatch.setattr("app.api.v1.analyze.parse_document", fake_parse)
+    monkeypatch.setattr("app.agent.nodes.parse.parse_document", fake_parse)
