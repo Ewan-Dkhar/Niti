@@ -1,6 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas import TaskStatus
+from app.services.parser import IngestionError
+from app.store import task_store
 
 client = TestClient(app)
 
@@ -33,6 +37,42 @@ def test_analyze_result_is_pollable() -> None:
     assert body["task_id"] == created["task_id"]
     assert body["status"] == "processing"
     assert body["result"] is None
+
+
+def test_analyze_records_ingestion_metadata() -> None:
+    created = client.post(
+        "/api/v1/analyze",
+        json={"document_url": "https://pib.gov.in/sample.pdf", "target_language": "bn-IN"},
+    ).json()
+
+    record = task_store.get(created["task_id"])
+
+    assert record is not None
+    assert record.parser == "pypdf"
+    assert record.page_count == 1
+    assert record.parsed_markdown_path is not None
+    assert record.status is TaskStatus.processing
+
+
+def test_analyze_marks_task_failed_when_ingestion_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def failing_parse(document_url: str, *, task_id: str, **kwargs: object) -> None:
+        raise IngestionError("blocked by upstream")
+
+    monkeypatch.setattr("app.api.v1.analyze.parse_document", failing_parse)
+
+    created = client.post(
+        "/api/v1/analyze",
+        json={"document_url": "https://pib.gov.in/broken.pdf", "target_language": "te-IN"},
+    ).json()
+
+    record = task_store.get(created["task_id"])
+
+    assert record is not None
+    assert record.status is TaskStatus.failed
+    assert record.error is not None
+    assert "blocked by upstream" in record.error
 
 
 def test_unknown_task_returns_404() -> None:

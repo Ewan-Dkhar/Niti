@@ -18,6 +18,9 @@ class TaskRecord:
     target_language: LanguageCode
     status: TaskStatus = TaskStatus.processing
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    parsed_markdown_path: str | None = None
+    parser: str | None = None
+    page_count: int | None = None
     result: AnalysisResult | None = None
     error: str | None = None
 

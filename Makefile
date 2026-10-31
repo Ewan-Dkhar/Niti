@@ -1,4 +1,4 @@
-.PHONY: sync dev-backend dev-frontend test lint fmt clean
+.PHONY: sync dev-backend dev-frontend test lint fmt verify-ingest clean
 
 sync:
 	uv sync
@@ -16,7 +16,10 @@ lint:
 	uv run ruff check backend
 
 fmt:
-	uv run ruff format backend
+	uv run ruff format backend scripts
+
+verify-ingest:
+	uv run python scripts/verify_ingestion.py "$(URL)"
 
 clean:
 	rm -rf .venv .pytest_cache .ruff_cache

@@ -1,6 +1,11 @@
-"""Shared pytest fixtures for schema tests."""
+"""Shared pytest fixtures."""
+
+from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
+
+from app.services.parser import ParsedDocument
 
 
 @pytest.fixture
@@ -36,3 +41,22 @@ def audit_result_payload() -> dict:
         "confidence_score": 0.92,
         "correction_guidance": None,
     }
+
+
+@pytest.fixture(autouse=True)
+def stub_document_parser(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Keep API tests offline by replacing the real PDF parser."""
+    markdown_path = tmp_path / "parsed.md"
+    markdown_path.write_text("# Stub policy\n\nParsed body.", encoding="utf-8")
+
+    async def fake_parse(document_url: str, *, task_id: str, **kwargs: object) -> ParsedDocument:
+        return ParsedDocument(
+            source_url=document_url,
+            markdown="# Stub policy\n\nParsed body.",
+            page_count=1,
+            parser="pypdf",
+            fetched_at=datetime.now(UTC),
+            markdown_path=markdown_path,
+        )
+
+    monkeypatch.setattr("app.api.v1.analyze.parse_document", fake_parse)

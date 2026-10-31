@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"
+    data_dir: str = "data"
 
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
