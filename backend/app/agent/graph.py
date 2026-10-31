@@ -1,5 +1,7 @@
 """LangGraph state machine for policy analysis."""
 
+from typing import cast
+
 from langgraph.graph import END, StateGraph
 
 from app.agent.nodes.audit import audit_verification_node, route_audit
@@ -36,4 +38,5 @@ analysis_graph = workflow.compile()
 
 async def run_analysis(initial_state: AgentState) -> AgentState:
     """Run the graph and return the merged final state."""
-    return await analysis_graph.ainvoke(initial_state)
+    # LangGraph types ainvoke as dict[str, Any] | Any; the graph's schema is AgentState.
+    return cast(AgentState, await analysis_graph.ainvoke(initial_state))
