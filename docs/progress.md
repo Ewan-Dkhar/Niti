@@ -6,7 +6,7 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - [x] Phase 1 — Config & API contract skeleton
 - [x] Phase 2 — Schema unit tests
 - [x] Phase 3 — Document ingestion & parsing (Docling)
-- [ ] Phase 4 — Hierarchical chunker + Qdrant hybrid index
+- [x] Phase 4 — Hierarchical chunker + Qdrant hybrid index
 - [ ] Phase 5 — LangGraph state machine skeleton
 - [ ] Phase 6 — Rule extraction node
 - [ ] Phase 7 — Hallucination audit node
@@ -24,3 +24,4 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - Phase 1: `pytest` 8 passed; ruff clean; live curl verified analyze (202), results (200), verify-citizen (501 stub), OpenAPI (200).
 - Phase 2: `pytest` 34 passed (26 new schema tests); ruff check/format clean; `known-first-party = ["app"]` added to ruff config.
 - Phase 3: `pytest` 47 passed; ruff clean; live `labour.gov.in` gazette parsed with pypdf (2 pages) and Docling (2 pages, 4,463 chars).
+- Phase 4: `pytest` 56 passed; ruff clean; live gazette chunked into 10 chunks and queried with multilingual-e5-large + BM25; "provident fund" returned the EPF inspection-charge table with page/clause citations.

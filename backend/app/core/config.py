@@ -31,6 +31,11 @@ class Settings(BaseSettings):
 
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
+    qdrant_path: str = "data/qdrant"
+    qdrant_collection: str = "niti_chunks"
+
+    dense_embedding_model: str = "intfloat/multilingual-e5-large"
+    sparse_embedding_model: str = "Qdrant/bm25"
 
     use_mock_llm: bool = True
     use_mock_tts: bool = True

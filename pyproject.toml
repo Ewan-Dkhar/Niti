@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "docling>=2.145.0",
     "pypdf>=6.21.4",
+    "qdrant-client[fastembed]>=1.20.0",
 ]
 
 [dependency-groups]
