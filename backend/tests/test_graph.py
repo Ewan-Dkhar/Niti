@@ -15,7 +15,7 @@ def test_graph_runs_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_parse(document_url: str, *, task_id: str, **kwargs: object) -> ParsedDocument:
         return ParsedDocument(
             source_url=document_url,
-            markdown="## Eligibility\n\nAnnual income below INR 3,00,000.",
+            markdown="# Sample Scheme\n\n## Eligibility\n\nAnnual income below INR 3,00,000.",
             page_count=1,
             parser="pypdf",
             fetched_at=datetime.now(UTC),
@@ -34,10 +34,11 @@ def test_graph_runs_end_to_end(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     )
 
-    assert final_state["parsed_markdown"].startswith("## Eligibility")
+    assert final_state["parsed_markdown"].startswith("# Sample Scheme")
     assert final_state["parser"] == "pypdf"
     assert final_state["page_count"] == 1
-    assert final_state["extracted_data"] == {}
+    assert final_state["extracted_data"]["policy_name"] == "Sample Scheme"
+    assert final_state["extracted_data"]["citation_source_map"]
     assert final_state["audit_report"]["is_grounded"] is True
     assert final_state["simplified_script"] == ""
     assert final_state["audio_output_url"] == ""

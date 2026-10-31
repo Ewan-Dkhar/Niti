@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     sarvam_api_key: str | None = None
 
+    extraction_provider: str = "auto"
+    extraction_model: str | None = None
+
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
     qdrant_path: str = "data/qdrant"

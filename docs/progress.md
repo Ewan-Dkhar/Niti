@@ -8,7 +8,7 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - [x] Phase 3 — Document ingestion & parsing (Docling)
 - [x] Phase 4 — Hierarchical chunker + Qdrant hybrid index
 - [x] Phase 5 — LangGraph state machine skeleton
-- [ ] Phase 6 — Rule extraction node
+- [x] Phase 6 — Rule extraction node
 - [ ] Phase 7 — Hallucination audit node
 - [ ] Phase 8 — Vernacular simplification
 - [ ] Phase 9 — Sarvam Bulbul v3 TTS
@@ -26,3 +26,4 @@ Phase plan: `/home/ewan/.opencode/plan/niti-phases.md`
 - Phase 3: `pytest` 47 passed; ruff clean; live `labour.gov.in` gazette parsed with pypdf (2 pages) and Docling (2 pages, 4,463 chars).
 - Phase 4: `pytest` 56 passed; ruff clean; live gazette chunked into 10 chunks and queried with multilingual-e5-large + BM25; "provident fund" returned the EPF inspection-charge table with page/clause citations.
 - Phase 5: `pytest` 62 passed; ruff clean; live graph run completed parse → extract → audit → simplify → voice with the expected stub state.
+- Phase 6: `pytest` 71 passed; ruff clean; mock provider extracted grounded fields + citations from the live gazette; Anthropic/OpenAI providers compile and are selected by key.
