@@ -7,16 +7,29 @@ services:
       USE_MOCK_LLM: ${USE_MOCK_LLM:-true}
       USE_MOCK_TTS: ${USE_MOCK_TTS:-true}
       USE_DOCLING: ${USE_DOCLING:-false}
+      OFFLINE_MODE: ${OFFLINE_MODE:-false}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       EXTRACTION_PROVIDER: ${EXTRACTION_PROVIDER:-auto}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-}
+      SIMPLIFICATION_MODEL: ${SIMPLIFICATION_MODEL:-openai/gpt-oss-120b}
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      SARVAM_TTS_MODEL: ${SARVAM_TTS_MODEL:-bulbul:v3}
+      SARVAM_SPEAKER: ${SARVAM_SPEAKER:-shreya}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
-      QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-niti_chunks}
+      QDRANT_PATH: ${QDRANT_PATH:-data/qdrant}
+      DENSE_EMBEDDING_MODEL: ${DENSE_EMBEDDING_MODEL:-intfloat/multilingual-e5-large}
+      SPARSE_EMBEDDING_MODEL: ${SPARSE_EMBEDDING_MODEL:-Qdrant/bm25}
+      MYSCHEME_API_URL: ${MYSCHEME_API_URL:-https://www.myscheme.gov.in/api/apisetu/schemes}
+      PIB_RSS_URL: ${PIB_RSS_URL:-https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3}
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
+      - ./backend:/app/backend
       - niti-data:/app/data
     depends_on:
       - qdrant
@@ -26,15 +39,17 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
       - backend
 
   qdrant:
-    image: qdrant/qdrant:v1.12.4
+    image: qdrant/qdrant:${QDRANT_VERSION:-v1.12.4}
     ports:
-      - "6333:6333"
+      - "${QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrant-data:/qdrant/storage
 

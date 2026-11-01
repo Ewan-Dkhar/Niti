@@ -71,11 +71,27 @@ export interface CitizenProfile {
   documents: string[];
 }
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+export function getApiBase(): string {
+  const envBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+  if (envBase && envBase !== "http://localhost:8000") {
+    return envBase;
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return envBase || "http://localhost:8000";
+}
+
+export const API_BASE = getApiBase();
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const base = getApiBase();
+  const response = await fetch(`${base}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -125,7 +141,7 @@ export function getSources(query = "", limit = 6) {
 export function audioUrl(path: string | null): string | null {
   if (!path) return null;
   if (path.startsWith("http")) return path;
-  return `${API_BASE}${path}`;
+  return `${getApiBase()}${path}`;
 }
 
 export const LANGUAGES: { code: LanguageCode; label: string; english: string }[] = [
