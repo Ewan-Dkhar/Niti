@@ -150,3 +150,28 @@ def test_openapi_schema_renders() -> None:
     assert "/api/v1/analyze" in paths
     assert "/api/v1/results/{task_id}" in paths
     assert "/api/v1/verify-citizen" in paths
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://10.30.174.164:3000",
+        "https://niti-frontend.onrender.com",
+        "https://niti.vercel.app",
+    ],
+)
+def test_cors_preflight_options(origin: str) -> None:
+    response = client.options(
+        "/api/v1/sources?limit=6",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "content-type",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert response.headers.get("access-control-allow-private-network") == "true"

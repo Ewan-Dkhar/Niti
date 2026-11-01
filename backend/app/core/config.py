@@ -54,7 +54,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        cleaned: list[str] = []
+        for origin in self.cors_origins.split(","):
+            val = origin.strip().strip("'\"").rstrip("/")
+            if val:
+                cleaned.append(val)
+        return cleaned or ["http://localhost:3000"]
 
 
 @lru_cache
